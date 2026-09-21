@@ -6,29 +6,14 @@ import type { Coin, ApiResponse } from '@chainly/shared';
 const app = express();
 const PORT = process.env.PORT || 5000;
 
-// Configured CORS to allow both local dev and production Vercel requests
-const allowedOrigins = [
-  'http://localhost:3000',
-  'https://chainly-web-gamma.vercel.app',
-];
-
 app.use(
   cors({
-    origin: (origin, callback) => {
-      // Allow requests with no origin (like mobile apps, curl, or server-to-server)
-      if (!origin || allowedOrigins.includes(origin)) {
-        callback(null, true);
-      } else {
-        callback(null, true); // Fallback to allow dynamically in production
-      }
-    },
-    credentials: true,
+    origin: '*', // Allows Vercel frontend requests
   })
 );
 
 app.use(express.json());
 
-// Fetch top crypto prices from CoinGecko
 app.get('/api/prices', async (_req: Request, res: Response<ApiResponse<Coin[]>>) => {
   try {
     const response = await axios.get<Coin[]>(
@@ -43,8 +28,9 @@ app.get('/api/prices', async (_req: Request, res: Response<ApiResponse<Coin[]>>)
         },
         headers: {
           'Accept': 'application/json',
-          'User-Agent': 'ChainlyApp/1.0',
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
         },
+        timeout: 10000,
       }
     );
 
@@ -55,7 +41,8 @@ app.get('/api/prices', async (_req: Request, res: Response<ApiResponse<Coin[]>>)
     });
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Failed to fetch coin prices';
-    
+    console.error('CoinGecko Error:', errorMessage);
+
     res.status(500).json({
       success: false,
       data: [],
