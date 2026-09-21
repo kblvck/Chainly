@@ -1,0 +1,22 @@
+{
+  "name": "chainly",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "concurrently -k -n \"server,web\" -c \"cyan,magenta\" \"npm run dev --prefix ./apps/server\" \"npm run dev --prefix ./apps/web\"",
+    "dev:server": "npm run dev --prefix ./apps/server",
+    "dev:web": "npm run dev --prefix ./apps/web",
+    "build": "npm run build --workspaces"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  }
+}
