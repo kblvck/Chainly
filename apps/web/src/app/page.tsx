@@ -7,8 +7,11 @@ import { useState, useEffect, useMemo } from 'react';
 import Image from 'next/image';
 import type { Coin, ApiResponse } from '@chainly/shared';
 
+// Use environment variable in production or fallback to localhost during development
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
+
 const fetchCryptoPrices = async (): Promise<Coin[]> => {
-  const res = await axios.get<ApiResponse<Coin[]>>('http://localhost:5000/api/prices');
+  const res = await axios.get<ApiResponse<Coin[]>>(`${API_BASE_URL}/api/prices`);
   return res.data.data;
 };
 
@@ -80,7 +83,7 @@ export default function Home() {
 
       {mounted && isError && (
         <div className="text-center py-12 px-4 text-rose-400 bg-rose-950/30 border border-rose-900 rounded-xl">
-          Failed to connect to Express backend at http://localhost:5000. Ensure your server is running (`npm run dev` in apps/server).
+          Failed to connect to backend server. Ensure the server is active.
         </div>
       )}
 
