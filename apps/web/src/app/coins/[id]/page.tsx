@@ -14,8 +14,13 @@ export default function CoinDetailPage() {
   const { data: coin, isLoading, isError } = useQuery<CoinDetail>({
     queryKey: ['coin-detail', id],
     queryFn: async () => {
-      const res = await fetch(`${API_BASE_URL}/api/prices/${id}`);
+      // Try /api/prices/:id first, fallback to /api/coins/:id if backend uses coins path
+      let res = await fetch(`${API_BASE_URL}/api/prices/${id}`);
+      if (!res.ok) {
+        res = await fetch(`${API_BASE_URL}/api/coins/${id}`);
+      }
       if (!res.ok) throw new Error('Failed to load coin details');
+      
       const json: ApiResponse<CoinDetail> = await res.json();
       return json.data;
     },
@@ -25,18 +30,23 @@ export default function CoinDetailPage() {
   if (isLoading) {
     return (
       <div className="min-h-screen bg-slate-950 text-slate-100 p-8 flex justify-center items-center">
-        <p className="text-slate-400">Loading coin details...</p>
+        <p className="text-slate-400 animate-pulse">Loading coin details...</p>
       </div>
     );
   }
 
   if (isError || !coin) {
     return (
-      <div className="min-h-screen bg-slate-950 text-slate-100 p-8">
-        <button onClick={() => router.back()} className="text-emerald-400 mb-4 hover:underline">
+      <div className="min-h-screen bg-slate-950 text-slate-100 p-8 max-w-4xl mx-auto">
+        <button 
+          onClick={() => router.back()} 
+          className="text-emerald-400 mb-4 hover:underline cursor-pointer"
+        >
           &larr; Back to Market
         </button>
-        <p className="text-red-400">Unable to load details for this coin.</p>
+        <div className="p-6 bg-rose-950/30 border border-rose-900 rounded-xl text-rose-400">
+          Unable to load details for this coin. Please verify backend server connection.
+        </div>
       </div>
     );
   }
@@ -46,12 +56,13 @@ export default function CoinDetailPage() {
   const high24h = coin.market_data?.high_24h?.usd;
   const low24h = coin.market_data?.low_24h?.usd;
   const priceChange = coin.market_data?.price_change_percentage_24h ?? 0;
+  
   const imageSrc =
-  typeof coin.image === 'object' && coin.image !== null
-    ? (coin.image as { large?: string; small?: string; thumb?: string }).large ||
-      (coin.image as { large?: string; small?: string; thumb?: string }).small ||
-      (coin.image as { large?: string; small?: string; thumb?: string }).thumb
-    : (coin.image as string | undefined);
+    typeof coin.image === 'object' && coin.image !== null
+      ? (coin.image as { large?: string; small?: string; thumb?: string }).large ||
+        (coin.image as { large?: string; small?: string; thumb?: string }).small ||
+        (coin.image as { large?: string; small?: string; thumb?: string }).thumb
+      : (coin.image as string | undefined);
 
   return (
     <main className="min-h-screen bg-slate-950 text-slate-100 p-8 max-w-4xl mx-auto">
@@ -64,7 +75,7 @@ export default function CoinDetailPage() {
           <img
             src={imageSrc}
             alt={coin.name}
-            className="w-16 h-16 rounded-full"
+            className="w-16 h-16 rounded-full border border-slate-800"
           />
         ) : null}
         <div>
@@ -81,7 +92,7 @@ export default function CoinDetailPage() {
 
         <div className="bg-slate-900 border border-slate-800 rounded-xl p-5">
           <p className="text-xs text-slate-400 mb-1">24H CHANGE</p>
-          <p className={`text-2xl font-bold ${priceChange >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+          <p className={`text-2xl font-bold ${priceChange >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
             {priceChange >= 0 ? '+' : ''}{priceChange.toFixed(2)}%
           </p>
         </div>
