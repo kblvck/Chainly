@@ -46,7 +46,12 @@ export default function CoinDetailPage() {
   const high24h = coin.market_data?.high_24h?.usd;
   const low24h = coin.market_data?.low_24h?.usd;
   const priceChange = coin.market_data?.price_change_percentage_24h ?? 0;
-  const imageSrc = coin.image?.large || coin.image?.small || coin.image?.thumb;
+  const imageSrc =
+  typeof coin.image === 'object' && coin.image !== null
+    ? (coin.image as { large?: string; small?: string; thumb?: string }).large ||
+      (coin.image as { large?: string; small?: string; thumb?: string }).small ||
+      (coin.image as { large?: string; small?: string; thumb?: string }).thumb
+    : (coin.image as string | undefined);
 
   return (
     <main className="min-h-screen bg-slate-950 text-slate-100 p-8 max-w-4xl mx-auto">
