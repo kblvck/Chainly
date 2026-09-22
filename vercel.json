@@ -1,0 +1,4 @@
+{
+  "buildCommand": "npm run build --workspace=@chainly/shared && npm run build --workspace=apps/web",
+  "outputDirectory": "apps/web/.next"
+}
