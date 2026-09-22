@@ -5,6 +5,7 @@ import axios from 'axios';
 import { TrendingUp, RefreshCw, Search } from 'lucide-react';
 import { useState, useEffect, useMemo } from 'react';
 import Image from 'next/image';
+import Link from 'next/link';
 import type { Coin, ApiResponse } from '@chainly/shared';
 
 // Use environment variable in production or fallback to localhost during development
@@ -45,7 +46,7 @@ export default function Home() {
     <main className="max-w-6xl mx-auto px-4 py-12 w-full">
       <header className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8">
         <div>
-          <h1 className="text-3xl font-bold flex items-center gap-2">
+          <h1 className="text-3xl font-bold flex items-center gap-2 text-slate-100">
             <TrendingUp className="text-emerald-400" />
             Chainly Crypto Tracker
           </h1>
@@ -105,38 +106,51 @@ export default function Home() {
                   const isPositive = change >= 0;
 
                   return (
-                    <tr key={coin.id} className="hover:bg-slate-800/40 transition-colors">
-                      <td className="p-4 flex items-center gap-3">
-                        <Image
-                          src={coin.image}
-                          alt={coin.name}
-                          width={24}
-                          height={24}
-                          unoptimized
-                          className="rounded-full"
-                        />
-                        <div>
-                          <span className="font-semibold block">{coin.name}</span>
-                          <span className="text-xs text-slate-500 uppercase">{coin.symbol}</span>
-                        </div>
+                    <tr
+                      key={coin.id}
+                      className="hover:bg-slate-800/60 transition-colors group"
+                    >
+                      <td className="p-4">
+                        <Link href={`/coins/${coin.id}`} className="flex items-center gap-3 w-full">
+                          <Image
+                            src={coin.image}
+                            alt={coin.name}
+                            width={24}
+                            height={24}
+                            unoptimized
+                            className="rounded-full group-hover:scale-110 transition-transform"
+                          />
+                          <div>
+                            <span className="font-semibold block text-slate-100 group-hover:text-emerald-400 transition-colors">
+                              {coin.name}
+                            </span>
+                            <span className="text-xs text-slate-500 uppercase">{coin.symbol}</span>
+                          </div>
+                        </Link>
                       </td>
                       <td className="p-4 font-mono font-medium">
-                        ${coin.current_price ? coin.current_price.toLocaleString() : 'N/A'}
+                        <Link href={`/coins/${coin.id}`} className="block w-full text-slate-100">
+                          ${coin.current_price ? coin.current_price.toLocaleString() : 'N/A'}
+                        </Link>
                       </td>
                       <td className="p-4">
-                        <span
-                          className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold ${
-                            isPositive
-                              ? 'bg-emerald-950/60 text-emerald-400 border border-emerald-800/50'
-                              : 'bg-rose-950/60 text-rose-400 border border-rose-800/50'
-                          }`}
-                        >
-                          {isPositive ? '+' : ''}
-                          {change.toFixed(2)}%
-                        </span>
+                        <Link href={`/coins/${coin.id}`} className="block w-full">
+                          <span
+                            className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold ${
+                              isPositive
+                                ? 'bg-emerald-950/60 text-emerald-400 border border-emerald-800/50'
+                                : 'bg-rose-950/60 text-rose-400 border border-rose-800/50'
+                            }`}
+                          >
+                            {isPositive ? '+' : ''}
+                            {change.toFixed(2)}%
+                          </span>
+                        </Link>
                       </td>
                       <td className="p-4 text-right font-mono text-slate-400">
-                        ${coin.market_cap ? coin.market_cap.toLocaleString() : 'N/A'}
+                        <Link href={`/coins/${coin.id}`} className="block w-full">
+                          ${coin.market_cap ? coin.market_cap.toLocaleString() : 'N/A'}
+                        </Link>
                       </td>
                     </tr>
                   );
