@@ -1,188 +1,248 @@
 'use client';
 
 import { useQuery } from '@tanstack/react-query';
-import { useParams, useRouter } from 'next/navigation';
+import axios from 'axios';
+import { TrendingUp, RefreshCw, Search, Star } from 'lucide-react';
+import { useState, useEffect, useMemo } from 'react';
+import Image from 'next/image';
 import Link from 'next/link';
-import type { CoinDetail, ApiResponse } from '@chainly/shared';
+import type { Coin, ApiResponse } from '@chainly/shared';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
 
-export default function CoinDetailPage() {
-  const { id } = useParams<{ id: string }>();
-  const router = useRouter();
+const fetchCryptoPrices = async (): Promise<Coin[]> => {
+  const res = await axios.get<ApiResponse<Coin[]>>(`${API_BASE_URL}/api/prices`);
+  return res.data.data;
+};
 
-  const { data: coin, isLoading, isError } = useQuery<CoinDetail>({
-    queryKey: ['coin-detail', id],
-    queryFn: async () => {
-      let res = await fetch(`${API_BASE_URL}/api/prices/${id}`);
-      if (!res.ok) {
-        res = await fetch(`${API_BASE_URL}/api/coins/${id}`);
+export default function Home() {
+  const [mounted, setMounted] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [activeTab, setActiveTab] = useState<'all' | 'watchlist'>('all');
+  const [watchlist, setWatchlist] = useState<string[]>([]);
+
+  // Load watchlist from localStorage on client mount
+  useEffect(() => {
+    setMounted(true);
+    try {
+      const saved = localStorage.getItem('chainly_watchlist');
+      if (saved) {
+        setWatchlist(JSON.parse(saved));
       }
-      if (!res.ok) throw new Error('Failed to load coin details');
+    } catch (e) {
+      console.error('Failed to load watchlist from localStorage', e);
+    }
+  }, []);
 
-      const json: ApiResponse<CoinDetail> = await res.json();
-      return json.data;
-    },
-    enabled: !!id,
+  // Save watchlist to localStorage on change
+  const toggleWatchlist = (coinId: string, e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    setWatchlist((prev) => {
+      const updated = prev.includes(coinId)
+        ? prev.filter((id) => id !== coinId)
+        : [...prev, coinId];
+
+      localStorage.setItem('chainly_watchlist', JSON.stringify(updated));
+      return updated;
+    });
+  };
+
+  const { data: coins, isLoading, isError, refetch, isFetching } = useQuery({
+    queryKey: ['cryptoPrices'],
+    queryFn: fetchCryptoPrices,
   });
 
-  if (isLoading) {
-    return (
-      <div className="min-h-screen bg-slate-950 text-slate-100 p-8 flex justify-center items-center">
-        <p className="text-slate-400 animate-pulse">Loading coin details and market data...</p>
-      </div>
-    );
-  }
+  // Filter coins dynamically based on search input and active tab
+  const filteredCoins = useMemo(() => {
+    if (!coins) return [];
 
-  if (isError || !coin) {
-    return (
-      <div className="min-h-screen bg-slate-950 text-slate-100 p-8 max-w-4xl mx-auto">
-        <button
-          onClick={() => router.back()}
-          className="text-emerald-400 mb-4 hover:underline cursor-pointer"
-        >
-          &larr; Back to Market
-        </button>
-        <div className="p-6 bg-rose-950/30 border border-rose-900 rounded-xl text-rose-400">
-          Unable to load details for this coin. Please verify backend server connection.
-        </div>
-      </div>
-    );
-  }
+    let result = coins;
 
-  // Market stats calculation
-  const marketData = coin.market_data as any;
-  const currentPrice = marketData?.current_price?.usd ?? 0;
-  const high24h = marketData?.high_24h?.usd;
-  const low24h = marketData?.low_24h?.usd;
-  const priceChange = marketData?.price_change_percentage_24h ?? 0;
-  const isPositive = priceChange >= 0;
+    // Watchlist filter
+    if (activeTab === 'watchlist') {
+      result = result.filter((coin) => watchlist.includes(coin.id));
+    }
 
-  // Native SVG Chart Coordinate Generator
-  const sparklinePrices: number[] = marketData?.sparkline_7d?.price || [];
-  const svgWidth = 800;
-  const svgHeight = 220;
+    // Search query filter
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase().trim();
+      result = result.filter(
+        (coin) =>
+          coin.name.toLowerCase().includes(query) ||
+          coin.symbol.toLowerCase().includes(query)
+      );
+    }
 
-  let pointsString = '';
-  let areaPointsString = '';
-
-  if (sparklinePrices.length > 0) {
-    const minPrice = Math.min(...sparklinePrices);
-    const maxPrice = Math.max(...sparklinePrices);
-    const range = maxPrice - minPrice || 1;
-
-    const points = sparklinePrices.map((price, i) => {
-      const x = (i / (sparklinePrices.length - 1)) * svgWidth;
-      const y = svgHeight - ((price - minPrice) / range) * (svgHeight - 20) - 10;
-      return `${x},${y}`;
-    });
-
-    pointsString = points.join(' ');
-    areaPointsString = `0,${svgHeight} ${pointsString} ${svgWidth},${svgHeight}`;
-  }
-
-  const imageSrc =
-    typeof coin.image === 'object' && coin.image !== null
-      ? (coin.image as { large?: string; small?: string; thumb?: string }).large ||
-        (coin.image as { large?: string; small?: string; thumb?: string }).small ||
-        (coin.image as { large?: string; small?: string; thumb?: string }).thumb
-      : (coin.image as string | undefined);
+    return result;
+  }, [coins, searchQuery, activeTab, watchlist]);
 
   return (
-    <main className="min-h-screen bg-slate-950 text-slate-100 p-8 max-w-4xl mx-auto">
-      <Link href="/" className="inline-block text-emerald-400 mb-6 hover:underline font-medium">
-        &larr; Back to Markets
-      </Link>
-
-      <div className="flex items-center gap-4 mb-8">
-        {imageSrc ? (
-          <img
-            src={imageSrc}
-            alt={coin.name}
-            className="w-16 h-16 rounded-full border border-slate-800"
-          />
-        ) : null}
+    <main className="max-w-6xl mx-auto px-4 py-12 w-full">
+      <header className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8">
         <div>
-          <h1 className="text-3xl font-bold">{coin.name}</h1>
-          <span className="text-slate-400 uppercase text-sm font-semibold">{coin.symbol}</span>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
-        <div className="bg-slate-900 border border-slate-800 rounded-xl p-5">
-          <p className="text-xs text-slate-400 mb-1">CURRENT PRICE</p>
-          <p className="text-2xl font-bold">${currentPrice.toLocaleString()}</p>
-        </div>
-
-        <div className="bg-slate-900 border border-slate-800 rounded-xl p-5">
-          <p className="text-xs text-slate-400 mb-1">24H CHANGE</p>
-          <p className={`text-2xl font-bold ${isPositive ? 'text-emerald-400' : 'text-rose-400'}`}>
-            {isPositive ? '+' : ''}{priceChange.toFixed(2)}%
+          <h1 className="text-3xl font-bold flex items-center gap-2 text-slate-100">
+            <TrendingUp className="text-emerald-400" />
+            Chainly Crypto Tracker
+          </h1>
+          <p className="text-slate-400 text-sm mt-1">
+            Real-time cryptocurrency market updates powered by Express & CoinGecko
           </p>
         </div>
+        <button
+          onClick={() => refetch()}
+          disabled={mounted ? isFetching : false}
+          className="flex items-center gap-2 px-4 py-2 bg-slate-800 hover:bg-slate-700 active:scale-95 text-slate-200 rounded-lg text-sm transition-all border border-slate-700 disabled:opacity-50 cursor-pointer"
+        >
+          <RefreshCw className={`w-4 h-4 ${mounted && isFetching ? 'animate-spin' : ''}`} />
+          Refresh
+        </button>
+      </header>
 
-        <div className="bg-slate-900 border border-slate-800 rounded-xl p-5">
-          <p className="text-xs text-slate-400 mb-1">24H RANGE</p>
-          <p className="text-sm text-slate-300 font-medium">
-            Low: ${low24h ? low24h.toLocaleString() : 'N/A'}
-          </p>
-          <p className="text-sm text-slate-300 font-medium">
-            High: ${high24h ? high24h.toLocaleString() : 'N/A'}
-          </p>
-        </div>
-      </div>
-
-      {/* 7-Day Sparkline Price Chart (Native SVG) */}
-      <div className="bg-slate-900 border border-slate-800 rounded-xl p-6 mb-8">
-        <h2 className="text-xl font-bold mb-4">7-Day Price Trend</h2>
-        {sparklinePrices.length > 0 ? (
-          <div className="w-full overflow-hidden">
-            <svg
-              viewBox={`0 0 ${svgWidth} ${svgHeight}`}
-              className="w-full h-56 stroke-2 fill-none"
-            >
-              <defs>
-                <linearGradient id="chartGradient" x1="0" y1="0" x2="0" y2="1">
-                  <stop
-                    offset="0%"
-                    stopColor={isPositive ? '#10b981' : '#f43f5e'}
-                    stopOpacity="0.3"
-                  />
-                  <stop
-                    offset="100%"
-                    stopColor={isPositive ? '#10b981' : '#f43f5e'}
-                    stopOpacity="0.0"
-                  />
-                </linearGradient>
-              </defs>
-
-              {/* Area Under Curve */}
-              <polygon points={areaPointsString} fill="url(#chartGradient)" stroke="none" />
-
-              {/* Trend Line */}
-              <polyline
-                points={pointsString}
-                stroke={isPositive ? '#10b981' : '#f43f5e'}
-                strokeWidth="2.5"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-            </svg>
-          </div>
-        ) : (
-          <div className="text-slate-500 text-center py-12">
-            No 7-day sparkline data available for this coin.
-          </div>
-        )}
-      </div>
-
-      {coin.description?.en && (
-        <div className="bg-slate-900 border border-slate-800 rounded-xl p-6">
-          <h2 className="text-xl font-bold mb-3">About {coin.name}</h2>
-          <div
-            className="text-slate-300 text-sm leading-relaxed space-y-2 prose prose-invert max-w-none"
-            dangerouslySetInnerHTML={{ __html: coin.description.en }}
+      {/* Controls: Search & Tabs */}
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4 mb-6">
+        <div className="relative flex-1">
+          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+          <input
+            type="text"
+            placeholder="Search by coin name or symbol (e.g. Bitcoin, BTC)..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full pl-10 pr-4 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-emerald-500/50 focus:ring-1 focus:ring-emerald-500/50 transition-all"
           />
+        </div>
+
+        <div className="flex items-center gap-1 bg-slate-900 border border-slate-800 p-1 rounded-xl">
+          <button
+            onClick={() => setActiveTab('all')}
+            className={`px-4 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+              activeTab === 'all'
+                ? 'bg-slate-800 text-slate-100 shadow-sm'
+                : 'text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            All Coins
+          </button>
+          <button
+            onClick={() => setActiveTab('watchlist')}
+            className={`flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+              activeTab === 'watchlist'
+                ? 'bg-slate-800 text-amber-400 shadow-sm'
+                : 'text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            <Star className="w-3.5 h-3.5 fill-current" />
+            Watchlist ({mounted ? watchlist.length : 0})
+          </button>
+        </div>
+      </div>
+
+      {(!mounted || isLoading) && (
+        <div className="text-center py-20 text-slate-400 animate-pulse">
+          Loading market prices...
+        </div>
+      )}
+
+      {mounted && isError && (
+        <div className="text-center py-12 px-4 text-rose-400 bg-rose-950/30 border border-rose-900 rounded-xl">
+          Failed to connect to backend server. Ensure the server is active.
+        </div>
+      )}
+
+      {mounted && coins && (
+        <div className="overflow-x-auto border border-slate-800 rounded-xl shadow-xl bg-slate-900/50 backdrop-blur">
+          <table className="w-full text-left border-collapse">
+            <thead>
+              <tr className="border-b border-slate-800 text-slate-400 text-xs uppercase tracking-wider bg-slate-900/80">
+                <th className="p-4 w-10 text-center"></th>
+                <th className="p-4">Asset</th>
+                <th className="p-4">Price (USD)</th>
+                <th className="p-4">24h Change</th>
+                <th className="p-4 text-right">Market Cap</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-800/60 text-sm">
+              {filteredCoins.length > 0 ? (
+                filteredCoins.map((coin) => {
+                  const change = coin.price_change_percentage_24h ?? 0;
+                  const isPositive = change >= 0;
+                  const isFavorited = watchlist.includes(coin.id);
+
+                  return (
+                    <tr
+                      key={coin.id}
+                      className="hover:bg-slate-800/60 transition-colors group"
+                    >
+                      <td className="p-4 text-center">
+                        <button
+                          onClick={(e) => toggleWatchlist(coin.id, e)}
+                          title={isFavorited ? 'Remove from Watchlist' : 'Add to Watchlist'}
+                          className="p-1 text-slate-600 hover:text-amber-400 transition-colors cursor-pointer"
+                        >
+                          <Star
+                            className={`w-4 h-4 ${
+                              isFavorited ? 'text-amber-400 fill-amber-400' : ''
+                            }`}
+                          />
+                        </button>
+                      </td>
+                      <td className="p-4">
+                        <Link href={`/coins/${coin.id}`} className="flex items-center gap-3 w-full">
+                          <Image
+                            src={coin.image}
+                            alt={coin.name}
+                            width={24}
+                            height={24}
+                            unoptimized
+                            className="rounded-full group-hover:scale-110 transition-transform"
+                          />
+                          <div>
+                            <span className="font-semibold block text-slate-100 group-hover:text-emerald-400 transition-colors">
+                              {coin.name}
+                            </span>
+                            <span className="text-xs text-slate-500 uppercase">{coin.symbol}</span>
+                          </div>
+                        </Link>
+                      </td>
+                      <td className="p-4 font-mono font-medium">
+                        <Link href={`/coins/${coin.id}`} className="block w-full text-slate-100">
+                          ${coin.current_price ? coin.current_price.toLocaleString() : 'N/A'}
+                        </Link>
+                      </td>
+                      <td className="p-4">
+                        <Link href={`/coins/${coin.id}`} className="block w-full">
+                          <span
+                            className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold ${
+                              isPositive
+                                ? 'bg-emerald-950/60 text-emerald-400 border border-emerald-800/50'
+                                : 'bg-rose-950/60 text-rose-400 border border-rose-800/50'
+                            }`}
+                          >
+                            {isPositive ? '+' : ''}
+                            {change.toFixed(2)}%
+                          </span>
+                        </Link>
+                      </td>
+                      <td className="p-4 text-right font-mono text-slate-400">
+                        <Link href={`/coins/${coin.id}`} className="block w-full">
+                          ${coin.market_cap ? coin.market_cap.toLocaleString() : 'N/A'}
+                        </Link>
+                      </td>
+                    </tr>
+                  );
+                })
+              ) : (
+                <tr>
+                  <td colSpan={5} className="p-8 text-center text-slate-500">
+                    {activeTab === 'watchlist'
+                      ? 'Your watchlist is empty. Star some coins to track them here!'
+                      : `No cryptocurrencies found matching "${searchQuery}"`}
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
         </div>
       )}
     </main>
