@@ -2,7 +2,7 @@
 
 import { useQuery } from '@tanstack/react-query';
 import axios from 'axios';
-import { TrendingUp, RefreshCw, Search, Star } from 'lucide-react';
+import { TrendingUp, RefreshCw, Search, Star, Briefcase } from 'lucide-react';
 import { useState, useEffect, useMemo } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
@@ -90,14 +90,23 @@ export default function Home() {
             Real-time cryptocurrency market updates powered by Express & CoinGecko
           </p>
         </div>
-        <button
-          onClick={() => refetch()}
-          disabled={mounted ? isFetching : false}
-          className="flex items-center gap-2 px-4 py-2 bg-slate-800 hover:bg-slate-700 active:scale-95 text-slate-200 rounded-lg text-sm transition-all border border-slate-700 disabled:opacity-50 cursor-pointer"
-        >
-          <RefreshCw className={`w-4 h-4 ${mounted && isFetching ? 'animate-spin' : ''}`} />
-          Refresh
-        </button>
+        <div className="flex items-center gap-3">
+          <Link
+            href="/portfolio"
+            className="flex items-center gap-2 px-4 py-2 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 rounded-lg text-sm transition-all border border-emerald-500/30 font-medium"
+          >
+            <Briefcase className="w-4 h-4" />
+            Portfolio
+          </Link>
+          <button
+            onClick={() => refetch()}
+            disabled={mounted ? isFetching : false}
+            className="flex items-center gap-2 px-4 py-2 bg-slate-800 hover:bg-slate-700 active:scale-95 text-slate-200 rounded-lg text-sm transition-all border border-slate-700 disabled:opacity-50 cursor-pointer"
+          >
+            <RefreshCw className={`w-4 h-4 ${mounted && isFetching ? 'animate-spin' : ''}`} />
+            Refresh
+          </button>
+        </div>
       </header>
 
       {/* Controls: Search & Tabs */}
