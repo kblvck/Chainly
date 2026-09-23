@@ -14,13 +14,12 @@ export default function CoinDetailPage() {
   const { data: coin, isLoading, isError } = useQuery<CoinDetail>({
     queryKey: ['coin-detail', id],
     queryFn: async () => {
-      // Try /api/prices/:id first, fallback to /api/coins/:id if backend uses coins path
       let res = await fetch(`${API_BASE_URL}/api/prices/${id}`);
       if (!res.ok) {
         res = await fetch(`${API_BASE_URL}/api/coins/${id}`);
       }
       if (!res.ok) throw new Error('Failed to load coin details');
-      
+
       const json: ApiResponse<CoinDetail> = await res.json();
       return json.data;
     },
@@ -30,7 +29,7 @@ export default function CoinDetailPage() {
   if (isLoading) {
     return (
       <div className="min-h-screen bg-slate-950 text-slate-100 p-8 flex justify-center items-center">
-        <p className="text-slate-400 animate-pulse">Loading coin details...</p>
+        <p className="text-slate-400 animate-pulse">Loading coin details and market data...</p>
       </div>
     );
   }
@@ -38,8 +37,8 @@ export default function CoinDetailPage() {
   if (isError || !coin) {
     return (
       <div className="min-h-screen bg-slate-950 text-slate-100 p-8 max-w-4xl mx-auto">
-        <button 
-          onClick={() => router.back()} 
+        <button
+          onClick={() => router.back()}
           className="text-emerald-400 mb-4 hover:underline cursor-pointer"
         >
           &larr; Back to Market
@@ -51,12 +50,37 @@ export default function CoinDetailPage() {
     );
   }
 
-  // Safe fallback values matching the CoinDetail shared interface
-  const currentPrice = coin.market_data?.current_price?.usd ?? 0;
-  const high24h = coin.market_data?.high_24h?.usd;
-  const low24h = coin.market_data?.low_24h?.usd;
-  const priceChange = coin.market_data?.price_change_percentage_24h ?? 0;
-  
+  // Market stats calculation
+  const marketData = coin.market_data as any;
+  const currentPrice = marketData?.current_price?.usd ?? 0;
+  const high24h = marketData?.high_24h?.usd;
+  const low24h = marketData?.low_24h?.usd;
+  const priceChange = marketData?.price_change_percentage_24h ?? 0;
+  const isPositive = priceChange >= 0;
+
+  // Native SVG Chart Coordinate Generator
+  const sparklinePrices: number[] = marketData?.sparkline_7d?.price || [];
+  const svgWidth = 800;
+  const svgHeight = 220;
+
+  let pointsString = '';
+  let areaPointsString = '';
+
+  if (sparklinePrices.length > 0) {
+    const minPrice = Math.min(...sparklinePrices);
+    const maxPrice = Math.max(...sparklinePrices);
+    const range = maxPrice - minPrice || 1;
+
+    const points = sparklinePrices.map((price, i) => {
+      const x = (i / (sparklinePrices.length - 1)) * svgWidth;
+      const y = svgHeight - ((price - minPrice) / range) * (svgHeight - 20) - 10;
+      return `${x},${y}`;
+    });
+
+    pointsString = points.join(' ');
+    areaPointsString = `0,${svgHeight} ${pointsString} ${svgWidth},${svgHeight}`;
+  }
+
   const imageSrc =
     typeof coin.image === 'object' && coin.image !== null
       ? (coin.image as { large?: string; small?: string; thumb?: string }).large ||
@@ -92,8 +116,8 @@ export default function CoinDetailPage() {
 
         <div className="bg-slate-900 border border-slate-800 rounded-xl p-5">
           <p className="text-xs text-slate-400 mb-1">24H CHANGE</p>
-          <p className={`text-2xl font-bold ${priceChange >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
-            {priceChange >= 0 ? '+' : ''}{priceChange.toFixed(2)}%
+          <p className={`text-2xl font-bold ${isPositive ? 'text-emerald-400' : 'text-rose-400'}`}>
+            {isPositive ? '+' : ''}{priceChange.toFixed(2)}%
           </p>
         </div>
 
@@ -106,6 +130,50 @@ export default function CoinDetailPage() {
             High: ${high24h ? high24h.toLocaleString() : 'N/A'}
           </p>
         </div>
+      </div>
+
+      {/* 7-Day Sparkline Price Chart (Native SVG) */}
+      <div className="bg-slate-900 border border-slate-800 rounded-xl p-6 mb-8">
+        <h2 className="text-xl font-bold mb-4">7-Day Price Trend</h2>
+        {sparklinePrices.length > 0 ? (
+          <div className="w-full overflow-hidden">
+            <svg
+              viewBox={`0 0 ${svgWidth} ${svgHeight}`}
+              className="w-full h-56 stroke-2 fill-none"
+            >
+              <defs>
+                <linearGradient id="chartGradient" x1="0" y1="0" x2="0" y2="1">
+                  <stop
+                    offset="0%"
+                    stopColor={isPositive ? '#10b981' : '#f43f5e'}
+                    stopOpacity="0.3"
+                  />
+                  <stop
+                    offset="100%"
+                    stopColor={isPositive ? '#10b981' : '#f43f5e'}
+                    stopOpacity="0.0"
+                  />
+                </linearGradient>
+              </defs>
+
+              {/* Area Under Curve */}
+              <polygon points={areaPointsString} fill="url(#chartGradient)" stroke="none" />
+
+              {/* Trend Line */}
+              <polyline
+                points={pointsString}
+                stroke={isPositive ? '#10b981' : '#f43f5e'}
+                strokeWidth="2.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+          </div>
+        ) : (
+          <div className="text-slate-500 text-center py-12">
+            No 7-day sparkline data available for this coin.
+          </div>
+        )}
       </div>
 
       {coin.description?.en && (
